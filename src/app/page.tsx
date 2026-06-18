@@ -18,13 +18,38 @@ export default function LoginPage() {
     const trimmed = phone.trim()
     if (!trimmed) return
 
+    // Extract only digits to handle cases where users type dashes or spaces (e.g. 050-1234567)
+    const digitsOnly = trimmed.replace(/\D/g, '')
+    
+    // If they typed something but it has no digits, don't proceed
+    if (!digitsOnly) {
+      setError('נא להזין מספר תקין')
+      return
+    }
+
+    // Create variations to allow logging in with or without the leading zero
+    // We also include the original trimmed input just in case the DB has exact matches with dashes
+    const variations = [trimmed, digitsOnly]
+    
+    if (digitsOnly.startsWith('0')) {
+      // If it starts with 0 (e.g. 0501234567), add the version without 0 (e.g. 501234567)
+      variations.push(digitsOnly.slice(1)) 
+    } else {
+      // If it doesn't start with 0 (e.g. 501234567), add the version with 0 (e.g. 0501234567)
+      variations.push(`0${digitsOnly}`)    
+    }
+
+    // Remove duplicates
+    const uniqueVariations = Array.from(new Set(variations))
+
     setIsLoading(true)
     setError(null)
 
     const { data, error: dbError } = await supabase
       .from('students')
       .select('id')
-      .eq('phone_number', trimmed)
+      .in('phone_number', uniqueVariations)
+      .limit(1)
       .maybeSingle()
 
     setIsLoading(false)
