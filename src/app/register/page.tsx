@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Sparkles, GraduationCap, ArrowLeft, Lock, Phone } from 'lucide-react'
+import { Sparkles, GraduationCap, ArrowLeft, Lock, Phone, Key } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 const FONT = "var(--font-heebo), 'Heebo', sans-serif"
@@ -11,19 +11,19 @@ const BG_GRAD = 'linear-gradient(160deg, #FDFAF4 0%, #F7F0E0 45%, #EFE5CC 100%)'
 
 export default function RegisterPage() {
   const router = useRouter()
-  const [step, setStep] = useState(1) // Only 1 step now!
 
   // Form Data
   const [teacherName, setTeacherName] = useState('')
   const [teacherPhone, setTeacherPhone] = useState('')
   const [className, setClassName] = useState('')
   const [adminPassword, setAdminPassword] = useState('')
+  const [accessCode, setAccessCode] = useState('')
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleCreateClass = async () => {
-    if (!teacherName || !className || !adminPassword || !teacherPhone) {
+    if (!teacherName || !className || !adminPassword || !teacherPhone || !accessCode) {
       setError('נא למלא את כל השדות')
       return
     }
@@ -32,6 +32,22 @@ export default function RegisterPage() {
     setError(null)
 
     try {
+      // 1. Check Access Code validity
+      const { data: codeData, error: codeError } = await supabase
+        .from('access_codes')
+        .select('*')
+        .eq('code', accessCode)
+        .single()
+
+      if (codeError || !codeData) {
+        throw new Error('קוד גישה לא קיים במערכת.')
+      }
+
+      if (codeData.is_used) {
+        throw new Error('קוד גישה זה כבר נוצל בעבר. אנא רכוש קוד חדש.')
+      }
+
+      // 2. Create the class
       const { data: classData, error: classError } = await supabase
         .from('classes')
         .insert({
@@ -49,12 +65,18 @@ export default function RegisterPage() {
 
       if (classError) throw classError
 
-      // Authenticate the admin automatically on creation!
+      // 3. Mark access code as used
+      await supabase
+        .from('access_codes')
+        .update({ is_used: true })
+        .eq('id', codeData.id)
+
+      // 4. Authenticate the admin automatically on creation!
       if (typeof window !== 'undefined') {
         sessionStorage.setItem(`admin_auth_${classData.id}`, 'true')
       }
 
-      // Redirect directly to the admin dashboard
+      // 5. Redirect directly to the admin dashboard
       router.push(`/class/${classData.id}/admin`)
 
     } catch (err: any) {
@@ -132,12 +154,24 @@ export default function RegisterPage() {
             </div>
           </div>
 
+          <div>
+            <label style={{ display: 'block', fontSize: '0.9rem', color: '#5C3D0E', fontWeight: 600, marginBottom: '0.4rem' }}>קוד גישה להפעלת כיתה</label>
+            <div style={{ position: 'relative' }}>
+              <span style={{ position: 'absolute', top: '50%', right: '1rem', transform: 'translateY(-50%)', color: '#C9A84C' }}>
+                <Key size={18} strokeWidth={1.8} />
+              </span>
+              <input type="text" placeholder="הכנס קוד שקיבלת" value={accessCode} onChange={e => setAccessCode(e.target.value)}
+                style={{ width: '100%', padding: '0.9rem 3rem 0.9rem 1rem', borderRadius: '12px', border: '1.5px solid rgba(201,168,76,0.35)', background: 'rgba(255,255,255,0.8)', fontSize: '1.1rem', color: '#1E1508', fontFamily: FONT, outline: 'none' }}
+              />
+            </div>
+          </div>
+
           {error && <div style={{ color: '#B83020', fontSize: '0.95rem', fontWeight: 500, textAlign: 'center', background: 'rgba(220,80,60,0.07)', padding: '0.5rem', borderRadius: '8px' }}>{error}</div>}
 
-          <button onClick={handleCreateClass} disabled={isLoading || !teacherName || !className || !adminPassword || !teacherPhone}
-            style={{ width: '100%', padding: '1rem', borderRadius: '12px', fontSize: '1.1rem', fontWeight: 700, color: '#fff', background: isLoading || !teacherName || !className || !adminPassword || !teacherPhone ? 'linear-gradient(135deg, #D4C4A0, #BBA870)' : GOLD_GRAD, border: 'none', cursor: isLoading || !teacherName || !className || !adminPassword || !teacherPhone ? 'not-allowed' : 'pointer', marginTop: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', boxShadow: isLoading || !teacherName || !className || !adminPassword || !teacherPhone ? 'none' : '0 8px 28px rgba(180,140,60,0.35)' }}
+          <button onClick={handleCreateClass} disabled={isLoading || !teacherName || !className || !adminPassword || !teacherPhone || !accessCode}
+            style={{ width: '100%', padding: '1rem', borderRadius: '12px', fontSize: '1.1rem', fontWeight: 700, color: '#fff', background: isLoading || !teacherName || !className || !adminPassword || !teacherPhone || !accessCode ? 'linear-gradient(135deg, #D4C4A0, #BBA870)' : GOLD_GRAD, border: 'none', cursor: isLoading || !teacherName || !className || !adminPassword || !teacherPhone || !accessCode ? 'not-allowed' : 'pointer', marginTop: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', boxShadow: isLoading || !teacherName || !className || !adminPassword || !teacherPhone || !accessCode ? 'none' : '0 8px 28px rgba(180,140,60,0.35)' }}
           >
-            {isLoading ? 'יוצר כיתה...' : 'צור כיתה ומעבר לניהול התלמידים'}
+            {isLoading ? 'בודק קוד ויוצר כיתה...' : 'צור כיתה ומעבר לניהול התלמידים'}
             {!isLoading && <ArrowLeft size={18} />}
           </button>
         </div>
