@@ -102,7 +102,7 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.9rem', color: '#5C3D0E', fontWeight: 600, marginBottom: '0.4rem' }}>מספר טלפון (למקרי חירום/שחזור)</label>
+            <label style={{ display: 'block', fontSize: '0.9rem', color: '#5C3D0E', fontWeight: 600, marginBottom: '0.4rem' }}>מספר טלפון</label>
             <div style={{ position: 'relative' }}>
               <span style={{ position: 'absolute', top: '50%', right: '1rem', transform: 'translateY(-50%)', color: '#C9A84C' }}>
                 <Phone size={18} strokeWidth={1.8} />
