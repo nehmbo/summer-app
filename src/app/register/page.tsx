@@ -74,7 +74,7 @@ export default function RegisterPage() {
 
       // 4. Authenticate the admin automatically on creation!
       if (typeof window !== 'undefined') {
-        sessionStorage.setItem(`admin_auth_${classData.id}`, 'true')
+        localStorage.setItem(`admin_auth_${classData.id}`, 'true')
       }
 
       // 5. Redirect directly to the admin dashboard

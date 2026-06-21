@@ -121,7 +121,8 @@ export default function AdminPage({ params }: { params: Promise<{ class_id: stri
         });
 
         if (typeof window !== 'undefined') {
-          if (sessionStorage.getItem(`admin_auth_${class_id}`) === 'true') {
+          const isAuth = localStorage.getItem(`admin_auth_${class_id}`);
+          if (isAuth === 'true') {
             setIsAuthenticated(true);
           } else {
             setIsLoading(false);
@@ -212,7 +213,7 @@ export default function AdminPage({ params }: { params: Promise<{ class_id: stri
       setIsAuthenticated(true);
       setAuthError('');
       if (typeof window !== 'undefined') {
-        sessionStorage.setItem(`admin_auth_${class_id}`, 'true');
+        localStorage.setItem(`admin_auth_${class_id}`, 'true');
       }
     } else {
       setAuthError('סיסמה שגויה');
@@ -221,7 +222,7 @@ export default function AdminPage({ params }: { params: Promise<{ class_id: stri
 
   const handleLogout = () => {
     if (typeof window !== 'undefined') {
-      sessionStorage.removeItem(`admin_auth_${class_id}`);
+      localStorage.removeItem(`admin_auth_${class_id}`);
     }
     setIsAuthenticated(false);
     setPasswordInput('');

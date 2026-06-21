@@ -42,7 +42,7 @@ export default function LoginPage() {
 
       // Authenticate the admin automatically
       if (typeof window !== 'undefined') {
-        sessionStorage.setItem(`admin_auth_${classData.id}`, 'true')
+        localStorage.setItem(`admin_auth_${classData.id}`, 'true')
       }
 
       // Redirect directly to the admin dashboard
