@@ -108,26 +108,25 @@ export default function ClassVotingPage({ params }: { params: Promise<{ class_id
 
   // Verify student by phone number
   const verifyStudent = async (phone: string, autoLogin: boolean = false) => {
-    // Basic formatting handle
-    const trimmed = phone.trim();
-    const digitsOnly = trimmed.replace(/\D/g, '');
-    if (!digitsOnly) return false;
+    const normalizePhone = (p: string) => {
+      if (!p) return '';
+      let digits = p.toString().replace(/\D/g, '');
+      if (digits.startsWith('972')) {
+        digits = '0' + digits.slice(3);
+      } else if (digits.length === 9 && !digits.startsWith('0')) {
+        digits = '0' + digits;
+      }
+      return digits;
+    };
 
-    const variations = [trimmed, digitsOnly];
-    if (digitsOnly.startsWith('0')) {
-      variations.push(digitsOnly.slice(1));
-    } else {
-      variations.push(`0${digitsOnly}`);
-    }
-    const uniqueVariations = Array.from(new Set(variations));
+    const targetPhone = normalizePhone(phone);
+    if (!targetPhone) return false;
 
+    // Fetch all students for this class to do robust phone matching
     const { data, error } = await supabase
       .from('students')
       .select('*')
-      .eq('class_id', class_id)
-      .in('phone_number', uniqueVariations)
-      .limit(1)
-      .maybeSingle();
+      .eq('class_id', class_id);
 
     if (error || !data) {
       if (autoLogin && typeof window !== 'undefined') {
@@ -136,9 +135,18 @@ export default function ClassVotingPage({ params }: { params: Promise<{ class_id
       return false;
     }
 
-    setStudentInfo(data);
+    const matchedStudent = data.find(s => normalizePhone(s.phone_number) === targetPhone);
+
+    if (!matchedStudent) {
+      if (autoLogin && typeof window !== 'undefined') {
+        localStorage.removeItem(`student_${class_id}`);
+      }
+      return false;
+    }
+
+    setStudentInfo(matchedStudent);
     setIsAuthenticated(true);
-    await loadVotingData(data.id);
+    await loadVotingData(matchedStudent.id);
     return true;
   };
 
