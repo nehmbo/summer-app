@@ -62,6 +62,7 @@ export default function ClassVotingPage({ params }: { params: Promise<{ class_id
   // Voting State
   const [isLoading, setIsLoading] = useState(true);
   const [points, setPoints] = useState<number | null>(null);
+  const [totalStudentsCount, setTotalStudentsCount] = useState<number>(0);
   const [hasVotedToday, setHasVotedToday] = useState(false);
   const [justVoted, setJustVoted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -160,22 +161,24 @@ export default function ClassVotingPage({ params }: { params: Promise<{ class_id
         classPoints = count ?? 0;
       }
       setPoints(classPoints);
+      setTotalStudentsCount(classStudents ? classStudents.length : 0);
 
-      // Compute this week's Sunday
+      // Compute this week's Saturday
       const today = new Date();
       const todayLocal = toISO(today);
-      const dayOfWeek = today.getDay(); // 0 = Sunday
+      const dayOfWeek = today.getDay(); // 0 = Sunday... 6 = Saturday
+      const dayOffset = (dayOfWeek + 1) % 7; // if Sat: 0, if Sun: 1
 
-      const sunday = new Date(today);
-      sunday.setDate(today.getDate() - dayOfWeek);
-      const sundayISO = toISO(sunday);
+      const saturday = new Date(today);
+      saturday.setDate(today.getDate() - dayOffset);
+      const saturdayISO = toISO(saturday);
 
-      // Fetch student's votes since Sunday
+      // Fetch student's votes since Saturday
       const { data: weekVotes } = await supabase
         .from('votes')
         .select('created_at')
         .eq('student_id', studentId)
-        .gte('created_at', `${sundayISO}T00:00:00`);
+        .gte('created_at', `${saturdayISO}T00:00:00`);
 
       const votedDates = new Set(
         (weekVotes ?? []).map(v => toISO(new Date(v.created_at)))
@@ -185,9 +188,9 @@ export default function ClassVotingPage({ params }: { params: Promise<{ class_id
 
       // Calculate missing days
       const missing: MissingDay[] = [];
-      for (let i = 0; i < dayOfWeek; i++) {
-        const d = new Date(sunday);
-        d.setDate(sunday.getDate() + i);
+      for (let i = 0; i < dayOffset; i++) {
+        const d = new Date(saturday);
+        d.setDate(saturday.getDate() + i);
         const iso = toISO(d);
         if (!votedDates.has(iso)) {
           missing.push({ iso, name: HEB_DAY_NAMES[d.getDay()] });
@@ -368,6 +371,28 @@ export default function ClassVotingPage({ params }: { params: Promise<{ class_id
   const pendingMissing = missingDays.filter(d => !completedMakeups.has(d.iso));
   const hasMakeupSection = pendingMissing.length > 0 || completedMakeups.size > 0;
 
+  // Calculate Goal
+  let targetGoal = 0;
+  if (classDetails && classDetails.created_at && totalStudentsCount > 0) {
+    const start = new Date(classDetails.created_at);
+    start.setHours(0,0,0,0);
+    const end = new Date(start.getFullYear(), 7, 31); // Aug 31
+    if (end >= start) {
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      const targetPercent = classDetails.target_percentage || 70;
+      targetGoal = Math.max(1, Math.floor(totalStudentsCount * totalDays * (targetPercent / 100)));
+    }
+  }
+
+  const currentPoints = points ?? 0;
+  const rawProgress = targetGoal > 0 ? (currentPoints / targetGoal) * 100 : 0;
+  const isBonus = currentPoints >= targetGoal && targetGoal > 0;
+  const progressPercent = Math.min(100, rawProgress);
+  const bonusGoal = targetGoal > 0 ? Math.floor(targetGoal * 1.5) : 0;
+  const rawBonusProgress = isBonus ? ((currentPoints - targetGoal) / (bonusGoal - targetGoal)) * 100 : 0;
+  const bonusProgressPercent = Math.min(100, Math.max(0, rawBonusProgress));
+
   return (
     <main dir="rtl" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', background: BG_GRAD, fontFamily: FONT }}>
 
@@ -403,6 +428,28 @@ export default function ClassVotingPage({ params }: { params: Promise<{ class_id
           {points === null ? '—' : points}
         </span>
       </div>
+
+      {/* Progress Bar Banner */}
+      {targetGoal > 0 && (
+        <div style={{ width: '100%', maxWidth: '600px', padding: '1rem 1.5rem', marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', position: 'relative', zIndex: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#5C3D0E', fontWeight: 700 }}>
+            <span>יעד כיתתי {isBonus && <span style={{ color: '#C9A84C', animation: 'popIn 0.5s' }}>— יעד בונוס! 🌟</span>}</span>
+            <span>{currentPoints} / {isBonus ? bonusGoal : targetGoal}</span>
+          </div>
+          <div style={{ width: '100%', height: '14px', background: 'rgba(201,168,76,0.2)', borderRadius: '999px', overflow: 'hidden', position: 'relative', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)' }}>
+            <div style={{ 
+              width: `${isBonus ? bonusProgressPercent : progressPercent}%`, 
+              height: '100%', 
+              background: isBonus ? 'linear-gradient(90deg, #FAD961 0%, #F76B1C 100%)' : GOLD_GRAD, 
+              borderRadius: '999px', transition: 'width 1s cubic-bezier(0.34,1.56,0.64,1)',
+              boxShadow: '0 0 10px rgba(201,168,76,0.5)'
+            }} />
+          </div>
+          <p style={{ fontSize: '0.8rem', color: '#8A7550', margin: 0, textAlign: 'center' }}>
+            {isBonus ? 'השגנו את היעד! עכשיו עולים ליעד בונוס! 🚀' : `הכיתה בדרך ליעד! חסרות עוד ${targetGoal - currentPoints} נקודות.`}
+          </p>
+        </div>
+      )}
 
       {/* Hero */}
       <div style={{

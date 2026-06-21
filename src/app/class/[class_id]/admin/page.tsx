@@ -32,11 +32,12 @@ function buildWeeks(earliestISO: string): Week[] {
   const weeks: Week[] = [];
   const today = toISO(new Date());
   const anchor = new Date(earliestISO + 'T12:00:00');
-  anchor.setDate(anchor.getDate() - anchor.getDay());
+  const dayOffset = (anchor.getDay() + 1) % 7;
+  anchor.setDate(anchor.getDate() - dayOffset);
   let n = 1;
   while (toISO(anchor) <= today) {
     const dates: string[] = [];
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 7; i++) {
       const d = new Date(anchor);
       d.setDate(anchor.getDate() + i);
       dates.push(toISO(d));
@@ -53,7 +54,7 @@ function countActiveDays(fromISO: string, toISO2: string): number {
   const cur = new Date(fromISO + 'T12:00:00');
   const end = new Date(toISO2 + 'T12:00:00');
   while (cur <= end) {
-    if (cur.getDay() !== 6) c++;
+    c++;
     cur.setDate(cur.getDate() + 1);
   }
   return c;
@@ -88,6 +89,7 @@ export default function AdminPage({ params }: { params: Promise<{ class_id: stri
     bottom_message: '',
     button_text: ''
   });
+  const [targetPercentage, setTargetPercentage] = useState<string>('70');
   const [isSavingTexts, setIsSavingTexts] = useState(false);
 
   // ── Dashboard Data State ────────────────────────────────────────────────────────
@@ -119,6 +121,7 @@ export default function AdminPage({ params }: { params: Promise<{ class_id: stri
           bottom_message: data.bottom_message || '',
           button_text: data.button_text || '✔️ עשיתי משהו חיובי'
         });
+        setTargetPercentage((data.target_percentage || 70).toString());
 
         if (typeof window !== 'undefined') {
           const isAuth = localStorage.getItem(`admin_auth_${class_id}`);
@@ -243,7 +246,8 @@ export default function AdminPage({ params }: { params: Promise<{ class_id: stri
           welcome_message: texts.welcome_message,
           voting_text: texts.voting_text,
           bottom_message: texts.bottom_message,
-          button_text: texts.button_text
+          button_text: texts.button_text,
+          target_percentage: parseInt(targetPercentage, 10) || 70
         })
         .eq('id', class_id);
       
@@ -477,6 +481,23 @@ export default function AdminPage({ params }: { params: Promise<{ class_id: stri
               placeholder="חתימה למטה"
             />
 
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1rem' }}>
+              <label style={{ fontSize: '1rem', color: '#5C3D0E', fontWeight: 600 }}>יעד כיתתי (%):</label>
+              <input 
+                type="number"
+                min="1"
+                max="1000"
+                value={targetPercentage}
+                onChange={e => setTargetPercentage(e.target.value)}
+                style={{
+                  width: '80px', textAlign: 'center', padding: '0.5rem', borderRadius: '8px', 
+                  fontSize: '1.1rem', fontWeight: 700, color: '#1E1508', fontFamily: FONT, 
+                  background: 'rgba(255,255,255,0.8)', border: '1.5px solid rgba(201,168,76,0.5)',
+                  outline: 'none'
+                }}
+              />
+            </div>
+
             <button 
               onClick={saveTexts}
               disabled={isSavingTexts}
@@ -557,6 +578,51 @@ export default function AdminPage({ params }: { params: Promise<{ class_id: stri
             </div>
           </div>
         </div>
+
+        {/* ── Progress Bar (Admin) ── */}
+        {(() => {
+          let targetGoal = 0;
+          if (classDetails && classDetails.created_at && students.length > 0) {
+            const start = new Date(classDetails.created_at);
+            start.setHours(0,0,0,0);
+            const end = new Date(start.getFullYear(), 7, 31);
+            if (end >= start) {
+              const diffTime = Math.abs(end.getTime() - start.getTime());
+              const totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+              const tp = classDetails.target_percentage || 70;
+              targetGoal = Math.max(1, Math.floor(students.length * totalDays * (tp / 100)));
+            }
+          }
+
+          if (targetGoal === 0) return null;
+
+          const currentPoints = totalPoints;
+          const rawProgress = targetGoal > 0 ? (currentPoints / targetGoal) * 100 : 0;
+          const isBonus = currentPoints >= targetGoal && targetGoal > 0;
+          const progressPercent = Math.min(100, rawProgress);
+          const bonusGoal = targetGoal > 0 ? Math.floor(targetGoal * 1.5) : 0;
+          const rawBonusProgress = isBonus ? ((currentPoints - targetGoal) / (bonusGoal - targetGoal)) * 100 : 0;
+          const bonusProgressPercent = Math.min(100, Math.max(0, rawBonusProgress));
+
+          return (
+            <div style={{ background: 'rgba(255,255,255,0.85)', padding: '1.5rem', borderRadius: '16px', border: '1.5px solid rgba(201,168,76,0.2)', boxShadow: '0 8px 30px rgba(180,140,60,0.06)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', color: '#5C3D0E', fontWeight: 700, marginBottom: '0.5rem' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Star size={18} color="#C9A84C" /> יעד כיתתי {isBonus && <span style={{ color: '#C9A84C' }}>— יעד בונוס! 🌟</span>}
+                </span>
+                <span>{currentPoints} / {isBonus ? bonusGoal : targetGoal}</span>
+              </div>
+              <div style={{ width: '100%', height: '14px', background: 'rgba(201,168,76,0.2)', borderRadius: '999px', overflow: 'hidden', position: 'relative' }}>
+                <div style={{ 
+                  width: `${isBonus ? bonusProgressPercent : progressPercent}%`, 
+                  height: '100%', 
+                  background: isBonus ? 'linear-gradient(90deg, #FAD961 0%, #F76B1C 100%)' : GOLD_GRAD, 
+                  borderRadius: '999px', transition: 'width 1s cubic-bezier(0.34,1.56,0.64,1)'
+                }} />
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── Summary cards ── */}
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
