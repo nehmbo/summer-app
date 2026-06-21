@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sparkles, GraduationCap, ArrowLeft, Lock, Phone, Key } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import Link from 'next/link'
 
 const FONT = "var(--font-heebo), 'Heebo', sans-serif"
 const GOLD_GRAD = 'linear-gradient(135deg, #C9A84C 0%, #D4A96A 50%, #B8860B 100%)'
@@ -174,6 +175,10 @@ export default function RegisterPage() {
             {isLoading ? 'בודק קוד ויוצר כיתה...' : 'צור כיתה ומעבר לניהול התלמידים'}
             {!isLoading && <ArrowLeft size={18} />}
           </button>
+
+          <Link href="/login" style={{ textAlign: 'center', marginTop: '1rem', color: '#8A7550', fontSize: '0.95rem', textDecoration: 'none', fontWeight: 500 }}>
+            כבר פתחת כיתה בעבר? לחצי כאן להתחברות
+          </Link>
         </div>
       </div>
     </main>
