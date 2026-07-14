@@ -296,18 +296,48 @@ export default function AdminPage({ params }: { params: Promise<{ class_id: stri
           const wb = XLSX.read(bstr, { type: 'binary' });
           const wsname = wb.SheetNames[0];
           const ws = wb.Sheets[wsname];
-          const data = XLSX.utils.sheet_to_json(ws) as any[];
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
 
-          const toInsert = data.map(row => {
-            const nameKey = Object.keys(row).find(k => k.includes('שם') || k.includes('name')) || Object.keys(row)[0];
-            const phoneKey = Object.keys(row).find(k => k.includes('טלפון') || k.includes('phone') || k.includes('נייד')) || Object.keys(row)[1];
+          const toInsert: any[] = [];
+          
+          const isPhoneNumber = (val: any) => {
+            if (!val) return false;
+            const str = String(val).replace(/[\s\-\+]/g, '');
+            return /^[0-9]{9,15}$/.test(str);
+          };
+
+          for (const row of rows) {
+            if (!Array.isArray(row)) continue;
             
-            return {
-              class_id,
-              name: row[nameKey]?.toString() || '',
-              phone_number: row[phoneKey]?.toString() || ''
-            };
-          }).filter(s => s.name && s.phone_number);
+            let phone = '';
+            const nameParts: string[] = [];
+            
+            for (const cell of row) {
+              const strVal = String(cell).trim();
+              if (!strVal) continue;
+
+              if (isPhoneNumber(strVal)) {
+                if (!phone) {
+                  const clean = strVal.replace(/[\s\-\+]/g, '');
+                  if (clean.length === 9 && clean.startsWith('5')) {
+                    phone = '0' + strVal;
+                  } else {
+                    phone = strVal;
+                  }
+                }
+              } else if (isNaN(Number(strVal))) {
+                nameParts.push(strVal);
+              }
+            }
+
+            if (phone && nameParts.length > 0) {
+              toInsert.push({
+                class_id,
+                name: nameParts.join(' '),
+                phone_number: phone
+              });
+            }
+          }
 
           if (toInsert.length > 0) {
             const { error } = await supabase.from('students').insert(toInsert);
