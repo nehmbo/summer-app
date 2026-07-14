@@ -87,7 +87,9 @@ export default function AdminPage({ params }: { params: Promise<{ class_id: stri
     welcome_message: '',
     voting_text: '',
     bottom_message: '',
-    button_text: ''
+    button_text: '',
+    share_prompt: '',
+    share_subtitle: ''
   });
   const [targetPercentage, setTargetPercentage] = useState<string>('70');
   const [isSavingTexts, setIsSavingTexts] = useState(false);
@@ -119,7 +121,9 @@ export default function AdminPage({ params }: { params: Promise<{ class_id: stri
           welcome_message: data.welcome_message || '',
           voting_text: data.voting_text || '',
           bottom_message: data.bottom_message || '',
-          button_text: data.button_text || '✔️ עשיתי משהו חיובי'
+          button_text: data.button_text || '✔️ עשיתי משהו חיובי',
+          share_prompt: data.share_prompt ?? 'רוצה לשתף במשהו טוב שעשית היום?',
+          share_subtitle: data.share_subtitle ?? 'לא חובה, רק אם בא לך ובאנונימיות לגמרי 🤍'
         });
         setTargetPercentage((data.target_percentage || 70).toString());
 
@@ -247,6 +251,8 @@ export default function AdminPage({ params }: { params: Promise<{ class_id: stri
           voting_text: texts.voting_text,
           bottom_message: texts.bottom_message,
           button_text: texts.button_text,
+          share_prompt: texts.share_prompt,
+          share_subtitle: texts.share_subtitle,
           target_percentage: parseInt(targetPercentage, 10) || 70
         })
         .eq('id', class_id);
@@ -498,6 +504,33 @@ export default function AdminPage({ params }: { params: Promise<{ class_id: stri
               }}
               placeholder="טקסט כפתור ההצבעה (למשל: ✔️ עשיתי משהו חיובי)"
             />
+
+            {/* Editable Share Section */}
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center', marginTop: '0.5rem', padding: '1rem', background: 'rgba(255,255,255,0.3)', borderRadius: '14px', border: '1.5px dashed rgba(201,168,76,0.3)' }}>
+              <span style={{ fontSize: '0.9rem', color: '#8A7550', fontWeight: 600 }}>אזור "שיתוף אנונימי" בדף תלמידה</span>
+              <input 
+                value={texts.share_prompt}
+                onChange={e => setTexts({...texts, share_prompt: e.target.value})}
+                style={{
+                  width: '100%', textAlign: 'center', padding: '0.7rem', borderRadius: '10px', 
+                  fontSize: '1.05rem', fontWeight: 600, color: '#5C3D0E', fontFamily: FONT, 
+                  background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(201,168,76,0.3)',
+                  outline: 'none'
+                }}
+                placeholder="טקסט קריאה לשיתוף (למשל: רוצה לשתף במשהו טוב שעשית היום?)"
+              />
+              <input 
+                value={texts.share_subtitle}
+                onChange={e => setTexts({...texts, share_subtitle: e.target.value})}
+                style={{
+                  width: '100%', textAlign: 'center', padding: '0.6rem', borderRadius: '10px', 
+                  fontSize: '0.85rem', fontWeight: 400, color: '#8A7550', fontFamily: FONT, 
+                  background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(201,168,76,0.2)',
+                  outline: 'none'
+                }}
+                placeholder="טקסט הסבר משני (למשל: לא חובה, רק אם בא לך...)"
+              />
+            </div>
 
             {/* Bottom Message */}
             <textarea 

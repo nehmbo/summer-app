@@ -1,7 +1,7 @@
 'use client';
 
 import { use, useState, useEffect, useCallback } from 'react';
-import { Sparkles, Phone, AlertCircle, CheckCircle2, CalendarCheck, LogOut } from 'lucide-react';
+import { Sparkles, Phone, AlertCircle, CheckCircle2, CalendarCheck, LogOut, Send } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { supabase } from '@/lib/supabase';
 
@@ -75,6 +75,12 @@ export default function ClassVotingPage({ params }: { params: Promise<{ class_id
   const [makeupMessages, setMakeupMessages] = useState<Map<string, string>>(new Map());
   const [submittingMakeup, setSubmittingMakeup] = useState<string | null>(null);
 
+  // Anonymous Sharing State
+  const [shareInput, setShareInput] = useState('');
+  const [isSharing, setIsSharing] = useState(false);
+  const [shares, setShares] = useState<any[]>([]);
+  const [justShared, setJustShared] = useState(false);
+
   // 1. Initial Load (Fetch class details & check session)
   useEffect(() => {
     async function fetchClass() {
@@ -87,6 +93,18 @@ export default function ClassVotingPage({ params }: { params: Promise<{ class_id
         
         if (clsError) throw clsError;
         setClassDetails(clsData);
+
+        // Fetch shares
+        const { data: sharesData } = await supabase
+          .from('anonymous_shares')
+          .select('content, created_at')
+          .eq('class_id', class_id)
+          .order('created_at', { ascending: false })
+          .limit(15);
+        
+        if (sharesData) {
+          setShares(sharesData);
+        }
 
         if (typeof window !== 'undefined') {
           const savedPhone = localStorage.getItem(`student_${class_id}`);
@@ -283,6 +301,24 @@ export default function ClassVotingPage({ params }: { params: Promise<{ class_id
     setSubmittingMakeup(null);
   }, [submittingMakeup, completedMakeups, studentInfo]);
 
+  // ── Anonymous Sharing ───────────────────────────────────────────────────────
+  const handleShareSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!shareInput.trim() || isSharing) return;
+    setIsSharing(true);
+
+    const newShare = { class_id, content: shareInput.trim() };
+    const { error } = await supabase.from('anonymous_shares').insert(newShare);
+
+    if (!error) {
+      setShareInput('');
+      setJustShared(true);
+      setShares(prev => [newShare, ...prev]);
+      setTimeout(() => setJustShared(false), 3000);
+    }
+    setIsSharing(false);
+  };
+
 
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center bg-[#FDFAF4]" dir="rtl">
@@ -400,6 +436,10 @@ export default function ClassVotingPage({ params }: { params: Promise<{ class_id
   const bonusGoal = targetGoal > 0 ? Math.floor(targetGoal * 1.5) : 0;
   const rawBonusProgress = isBonus ? ((currentPoints - targetGoal) / (bonusGoal - targetGoal)) * 100 : 0;
   const bonusProgressPercent = Math.min(100, Math.max(0, rawBonusProgress));
+
+  const sharePrompt = classDetails.share_prompt ?? 'רוצה לשתף במשהו טוב שעשית היום?';
+  const shareSubtitle = classDetails.share_subtitle ?? 'לא חובה, רק אם בא לך ובאנונימיות לגמרי 🤍';
+  const showShareSection = sharePrompt.trim() !== '' || shareSubtitle.trim() !== '';
 
   return (
     <main dir="rtl" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', background: BG_GRAD, fontFamily: FONT }}>
@@ -522,6 +562,63 @@ export default function ClassVotingPage({ params }: { params: Promise<{ class_id
           )}
         </div>
 
+        {/* ══════════ ANONYMOUS SHARE ══════════ */}
+        {showShareSection && (
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', marginTop: '1rem' }}>
+            <form onSubmit={handleShareSubmit} style={{ position: 'relative', width: '100%', maxWidth: '380px' }}>
+              <input 
+                type="text"
+                value={shareInput}
+                onChange={e => setShareInput(e.target.value)}
+                placeholder={sharePrompt}
+                style={{
+                  width: '100%', padding: '0.9rem 3rem', borderRadius: '16px',
+                  border: '1.5px solid rgba(201,168,76,0.3)', background: 'rgba(255,255,255,0.7)',
+                  fontSize: '1rem', color: '#5C3D0E', fontFamily: FONT, outline: 'none',
+                  boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.02), 0 4px 12px rgba(180,140,60,0.08)',
+                  transition: 'all 0.2s ease', textAlign: 'center'
+                }}
+              />
+            <button 
+              type="submit" 
+              disabled={isSharing || !shareInput.trim()}
+              style={{
+                position: 'absolute', top: '50%', left: '0.6rem', transform: 'translateY(-50%)',
+                width: '34px', height: '34px', borderRadius: '50%', background: (!shareInput.trim() || isSharing) ? '#D4C4A0' : GOLD_GRAD,
+                border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#fff', cursor: (!shareInput.trim() || isSharing) ? 'not-allowed' : 'pointer',
+                boxShadow: (!shareInput.trim() || isSharing) ? 'none' : '0 2px 8px rgba(180,140,60,0.3)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              {justShared ? <CheckCircle2 size={16} /> : <Send size={15} style={{ transform: 'rotate(180deg) translateX(1px)' }} />}
+              </button>
+            </form>
+            <span style={{ fontSize: '0.8rem', color: '#9A8060', fontWeight: 300, textAlign: 'center' }}>
+              {shareSubtitle}
+            </span>
+
+          {/* Train Marquee */}
+          {shares.length > 0 && (
+            <div style={{ marginTop: '1.25rem', width: '100%', height: '40px', position: 'relative', overflow: 'hidden' }}>
+              <div style={{
+                position: 'absolute', top: 0, height: '100%',
+                display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap', width: 'max-content',
+                animation: `trainScroll ${Math.max(12, shares.length * 5)}s linear infinite`
+              }}>
+                {shares.map((share, idx) => (
+                  <div key={idx} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '0 0.5rem' }}>
+                    <span style={{ fontSize: '1rem', color: '#5C3D0E', fontWeight: 500, fontStyle: 'italic' }}>
+                      "{share.content}"
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        )}
+
         {/* ══════════ MAKEUP VOTES SECTION ══════════ */}
         {hasMakeupSection && (
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.85rem', marginTop: '0.5rem' }}>
@@ -586,6 +683,10 @@ export default function ClassVotingPage({ params }: { params: Promise<{ class_id
           30%  { transform: translateX(-4px); opacity: 1; }
           60%  { transform: translateX(3px); }
           100% { transform: translateX(0); }
+        }
+        @keyframes trainScroll {
+          0% { left: 0; transform: translateX(-100%); }
+          100% { left: 100%; transform: translateX(0); }
         }
       `}</style>
     </main>
