@@ -11,6 +11,5 @@ jobs:
     steps:
       - name: Ping Supabase API
         run: |
-          curl -sS --fail -X GET "https://piwnyzgzviivzfefdknl.supabase.co/rest/v1/" \
-            -H "apikey:eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpd255emd6dmlpdnpmZWZka25sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MzcyNzksImV4cCI6MjA5NzIxMzI3OX0.b19U8SNPkeMbigoAftbJLKUhKVCOvAqExCejgVaV81c" \
-            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpd255emd6dmlpdnpmZWZka25sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MzcyNzksImV4cCI6MjA5NzIxMzI3OX0.b19U8SNPkeMbigoAftbJLKUhKVCOvAqExCejgVaV81c"
+          curl -sS --fail -X GET "https://piwnyzgzviivzfefdknl.supabase.co/auth/v1/settings" \
+            -H "apikey: sb_publishable_ybZk96koxI6pj0_7a3XeRQ_q_kSs6qP"
